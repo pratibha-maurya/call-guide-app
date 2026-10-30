@@ -1,0 +1,159 @@
+{
+  "_note": "SEED content from the structure page. 'maySay' and 'taps' are to be replaced with patterns tallied from the 100 transcripts.",
+  "stages": [
+    {
+      "no": 1,
+      "key": "opening",
+      "name": "Opening",
+      "purpose": "Reach the right person and say who you are. They decide in ten seconds if this is worth a minute.",
+      "maySay": [
+        "What is this regarding?",
+        "I'm driving, can you call later?",
+        "He left the company last year."
+      ],
+      "taps": [
+        { "key": "right_person", "label": "Right person, listening" },
+        { "key": "gatekeeper", "label": "Gatekeeper asked why" },
+        { "key": "busy_elsewhere", "label": "Busy / somewhere else" },
+        { "key": "wrong_contact", "label": "Wrong or old contact" }
+      ],
+      "wordsHint": "Anything they said when they picked up"
+    },
+    {
+      "no": 2,
+      "key": "purpose",
+      "name": "Purpose",
+      "purpose": "Say why you called in one or two sentences they could repeat to a colleague.",
+      "maySay": [
+        "What exactly does your company do?",
+        "Where did you get my number?",
+        "Is this a sales call?"
+      ],
+      "taps": [
+        { "key": "asked_what_we_do", "label": "Asked what we do" },
+        { "key": "asked_number_source", "label": "Asked where we got the number" },
+        { "key": "called_it_sales", "label": "Said it's a sales call" },
+        { "key": "let_me_go_on", "label": "Let me go on" }
+      ],
+      "wordsHint": "How they reacted to why you called"
+    },
+    {
+      "no": 3,
+      "key": "permission",
+      "name": "Permission",
+      "purpose": "Get a clear yes, a clear no, or a time to call back. Talking on without one is not a yes.",
+      "maySay": [
+        "Call me after two.",
+        "Send it on WhatsApp first.",
+        "Okay... go ahead."
+      ],
+      "taps": [
+        { "key": "yes_now", "label": "Yes, talk now" },
+        { "key": "call_back_time", "label": "Call back at a time" },
+        { "key": "send_first", "label": "Send something first" },
+        { "key": "no_answer_kept_talking", "label": "Kept talking, no answer" },
+        { "key": "clear_no", "label": "Clear no" }
+      ],
+      "wordsHint": "The time or condition they gave"
+    },
+    {
+      "no": 4,
+      "key": "their_business",
+      "name": "Their business",
+      "purpose": "Ask about their company and their work before saying anything about yours.",
+      "maySay": [
+        "We're a manufacturing unit, that's it.",
+        "No, we don't make that, we do something else.",
+        "First tell me about yourself."
+      ],
+      "taps": [
+        { "key": "described_it", "label": "Described their business" },
+        { "key": "one_line", "label": "One line, waiting for pitch" },
+        { "key": "corrected_me", "label": "Corrected me" },
+        { "key": "asked_me_first", "label": "Asked me to go first" }
+      ],
+      "wordsHint": "What they said they do"
+    },
+    {
+      "no": 5,
+      "key": "their_need",
+      "name": "Their need, in their words",
+      "purpose": "Hear what they are trying to do or struggling with. Write down exactly what they say.",
+      "maySay": [
+        "We want to enter a new market.",
+        "Everything is fine, we don't need anything.",
+        "What can you do for a company like ours?"
+      ],
+      "taps": [
+        { "key": "named_goal", "label": "Named a goal or problem" },
+        { "key": "all_fine", "label": "Everything is fine" },
+        { "key": "turned_it_around", "label": "Asked what we can do" }
+      ],
+      "wordsHint": "Their exact words. This is the line the next call is built on.",
+      "wordsRequired": true
+    },
+    {
+      "no": 6,
+      "key": "objection",
+      "name": "Objection",
+      "purpose": "Hear the reason for a no and understand it. Don't talk over it.",
+      "maySay": [
+        "We already have a consultant.",
+        "Speak to the owner, not me.",
+        "Send something in writing, we'll see."
+      ],
+      "taps": [
+        { "key": "has_someone", "label": "Already have agency / team" },
+        { "key": "wrong_person", "label": "Not the right person" },
+        { "key": "send_in_writing", "label": "Send in writing" },
+        { "key": "no_objection", "label": "No objection raised" }
+      ],
+      "wordsHint": "The reason, as they put it"
+    },
+    {
+      "no": 7,
+      "key": "next_step",
+      "name": "Next step",
+      "purpose": "Agree one concrete thing, with a time or a channel.",
+      "maySay": [
+        "Send it on WhatsApp, I'll look.",
+        "Call me Thursday at 4.",
+        "Talk to my colleague, here's the number."
+      ],
+      "taps": [
+        { "key": "send_document", "label": "Send a document" },
+        { "key": "call_at_their_time", "label": "Call at their named time" },
+        { "key": "meeting", "label": "Meeting booked" },
+        { "key": "referral", "label": "Referred to colleague" },
+        { "key": "none", "label": "No next step" }
+      ],
+      "wordsHint": "The time, channel or name they gave"
+    },
+    {
+      "no": 8,
+      "key": "close",
+      "name": "Close",
+      "purpose": "End clearly and record the outcome, the next step, and their words from stage 5.",
+      "maySay": [
+        "Okay, thank you, bye.",
+        "(line drops mid-sentence)",
+        "Nice talking, but not for us."
+      ],
+      "taps": [
+        { "key": "clean_end", "label": "Ended clearly" },
+        { "key": "dropped", "label": "Line dropped / hung up" },
+        { "key": "warm_no", "label": "Warm goodbye after a no" }
+      ],
+      "wordsHint": "Last thing they said"
+    }
+  ],
+  "outcomes": [
+    { "key": "meeting_booked", "label": "Meeting booked" },
+    { "key": "callback_scheduled", "label": "Callback at a set time" },
+    { "key": "document_sent", "label": "Send document" },
+    { "key": "referred", "label": "Referred to someone else" },
+    { "key": "not_interested", "label": "Not interested" },
+    { "key": "wrong_contact", "label": "Wrong / unreachable contact" },
+    { "key": "dropped", "label": "Call dropped" }
+  ]
+}

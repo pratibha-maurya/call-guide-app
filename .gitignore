@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.env.local
+frontend/screenshots/
+transcripts/
+*.zip
+.DS_Store
