@@ -21,6 +21,22 @@ function unconfiguredDb() {
   });
 }
 
+// Columns GET /calls?q= searches.
+export const SEARCH_COLUMNS = ['prospect_name', 'company', 'prospect_role'];
+
+// Builds the PostgREST or= filter for a case-insensitive substring search, e.g.
+//   prospect_name.ilike."%ravi%",company.ilike."%ravi%",prospect_role.ilike."%ravi%"
+// Two layers of escaping, because the text is user input:
+// 1. LIKE: backslash-escape \, % and _ so they match themselves, not "anything".
+// 2. PostgREST: wrap the value in double quotes so , ( ) . : cannot end the value
+//    or start a new filter; inside quotes only \ and " need a backslash.
+// A "*" still acts as a wildcard (PostgREST maps it to %); harmless for search.
+export function searchFilter(term) {
+  const like = `%${term.replace(/[\\%_]/g, '\\$&')}%`;
+  const quoted = `"${like.replace(/[\\"]/g, '\\$&')}"`;
+  return SEARCH_COLUMNS.map((col) => `${col}.ilike.${quoted}`).join(',');
+}
+
 export function createDb({ url, serviceKey }) {
   if (!url || !serviceKey) {
     console.warn(JSON.stringify({ level: 'warn', msg: 'SUPABASE_URL / SUPABASE_SERVICE_KEY missing; data routes return 503' }));
@@ -79,16 +95,31 @@ export function createDb({ url, serviceKey }) {
     },
 
     // One query: embed only the stage-5 row of each call (no N+1).
-    async listCalls(limit) {
-      const rows = unwrap(await sb.from('calls')
+    // q and status are optional and already validated (validate.listQuery).
+    async listCalls({ limit, q = null, status = null }) {
+      let query = sb.from('calls')
         .select('*, call_stages(prospect_words)')
-        .eq('call_stages.stage_no', 5)
-        .order('started_at', { ascending: false })
-        .limit(limit));
+        .eq('call_stages.stage_no', 5);
+      if (status) query = query.eq('status', status);
+      if (q) query = query.or(searchFilter(q));
+      const rows = unwrap(await query.order('started_at', { ascending: false }).limit(limit));
       return rows.map(({ call_stages, ...call }) => ({
         ...call,
         need_words: call_stages?.[0]?.prospect_words ?? null,
       }));
+    },
+
+    // Raw rows for GET /stats; stats.js does the counting. Two small queries
+    // instead of a SQL view/RPC, so the schema stays as it is. Fine for a
+    // free-tier project with at most a few thousand calls (capped at 5000).
+    async statsData() {
+      const calls = unwrap(await sb.from('calls')
+        .select('id, status, stage_reached, outcome').limit(5000));
+      const { count, error } = await sb.from('call_stages')
+        .select('id', { count: 'exact', head: true })
+        .eq('stage_no', 5).not('prospect_words', 'is', null).neq('prospect_words', '');
+      if (error) throw new Error(`db: ${error.message}`);
+      return { calls, withNeedWords: count ?? 0 };
     },
   };
 }

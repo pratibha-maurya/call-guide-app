@@ -15,7 +15,11 @@ export default function Header() {
         </span>
         <nav className="nav" aria-label="Main">
           <NavLink to="/" end className="nav-link">
+            Dashboard
+          </NavLink>
+          <NavLink to="/call" className="nav-link">
             {onCall ? 'Live call' : 'New call'}
+            {onCall && <span className="nav-live" aria-hidden="true" />}
           </NavLink>
           <NavLink to="/calls" className="nav-link">
             Past calls

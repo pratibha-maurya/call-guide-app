@@ -19,6 +19,8 @@ function restore() {
 export function LiveCallProvider({ children }) {
   const [state, dispatch] = useReducer(callReducer, undefined, restore);
   const [toast, setToast] = useState(null); // { message, retry? }
+  const [inFlight, setInFlight] = useState(0); // saves waiting for the server
+  const [savedOnce, setSavedOnce] = useState(false);
 
   // Async saves need the latest state, not the one captured when they started.
   const stateRef = useRef(state);
@@ -36,15 +38,18 @@ export function LiveCallProvider({ children }) {
     const payload = stagePayload(stateRef.current, stageNo);
     const request = api.saveStage(call.id, payload);
     pendingSaves.current.add(request);
+    setInFlight((n) => n + 1);
     try {
       await request;
       dispatch({ type: 'saveOk', stageNo });
+      setSavedOnce(true);
       return true;
     } catch {
       dispatch({ type: 'saveFailed', stageNo });
       return false;
     } finally {
       pendingSaves.current.delete(request);
+      setInFlight((n) => n - 1);
     }
   }, []);
 
@@ -86,6 +91,13 @@ export function LiveCallProvider({ children }) {
       dispatch({ type: 'advance', endedAt: Date.now() });
       saveInBackground(stageNo);
     },
+    // Same as Next, backwards: save what's on screen, then move.
+    previous() {
+      const { current } = stateRef.current;
+      if (current <= 1) return;
+      saveInBackground(current);
+      dispatch({ type: 'goTo', stageNo: current - 1 });
+    },
     goTo(stageNo) {
       const { current } = stateRef.current;
       if (stageNo === current) return;
@@ -121,14 +133,18 @@ export function LiveCallProvider({ children }) {
     },
     reset() {
       setToast(null);
+      setSavedOnce(false);
       dispatch({ type: 'reset' });
     },
     retryUnsaved,
     dismissToast: () => setToast(null),
   };
 
+  // For the small "Saved / Saving / Not saved" line by the footer.
+  const saveStatus = inFlight > 0 ? 'saving' : state.unsaved.length ? 'failed' : savedOnce ? 'saved' : 'idle';
+
   return (
-    <LiveCallContext.Provider value={{ state, toast, ...actions }}>{children}</LiveCallContext.Provider>
+    <LiveCallContext.Provider value={{ state, toast, saveStatus, ...actions }}>{children}</LiveCallContext.Provider>
   );
 }
 

@@ -5,6 +5,7 @@ export default function ProspectBar() {
   const { state } = useLiveCall();
   const { call, current, phase, startedAt, endedAt } = state;
   const detail = [call.prospect_role, call.company].filter(Boolean).join(', ');
+  const closing = phase === 'closing';
 
   return (
     <div className="prospect">
@@ -13,9 +14,12 @@ export default function ProspectBar() {
         {detail && <p className="prospect-detail">{detail}</p>}
       </div>
       <div className="prospect-meta">
-        <CallTimer startedAt={startedAt} endedAt={phase === 'closing' ? endedAt : null} />
-        <span className="prospect-step">{phase === 'closing' ? 'Wrapping up' : `Stage ${current} of 8`}</span>
+        <CallTimer startedAt={startedAt} endedAt={closing ? endedAt : null} />
+        <span className="prospect-step">{closing ? 'Wrapping up' : `Stage ${current} of 8`}</span>
       </div>
+      <span className="progress" aria-hidden="true">
+        <span className="progress-fill" style={{ width: `${closing ? 100 : (current / 8) * 100}%` }} />
+      </span>
     </div>
   );
 }

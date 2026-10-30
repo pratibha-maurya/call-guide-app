@@ -1,18 +1,26 @@
 import { useLiveCall } from '../../hooks/useLiveCall.jsx';
 import { useStages } from '../../lib/StagesContext.jsx';
 import { useStageKeys } from '../../hooks/useStageKeys.js';
+import { useSuggest } from '../../hooks/useSuggest.js';
 import TheyMaySay from './TheyMaySay.jsx';
 import TapOptions from './TapOptions.jsx';
 import WordsBox from './WordsBox.jsx';
+import SuggestBox from './SuggestBox.jsx';
 import StageFooter from './StageFooter.jsx';
 
 export default function StagePanel() {
-  const { state, tap, setWords, next } = useLiveCall();
+  const { state, tap, setWords, next, previous } = useLiveCall();
   const { stageByNo } = useStages();
   const stage = stageByNo(state.current);
   const entry = state.entries[state.current] ?? { tap: null, words: '' };
+  const suggestion = useSuggest(state.call.id, state.current);
 
-  useStageKeys({ taps: stage.taps, onTap: tap, onNext: next, enabled: true });
+  // Ask with what's on screen right now, saved or not.
+  const askAi = () => {
+    if (suggestion.status !== 'loading') suggestion.ask(entry);
+  };
+
+  useStageKeys({ taps: stage.taps, onTap: tap, onNext: next, onPrev: previous, onSuggest: askAi, enabled: true });
 
   return (
     <section className={`stage${stage.wordsRequired ? ' stage-key' : ''}`} aria-labelledby="stage-title">
@@ -23,7 +31,10 @@ export default function StagePanel() {
       <p className="purpose">{stage.purpose}</p>
 
       <div className="stage-body">
-        <TheyMaySay lines={stage.maySay} />
+        <div className="stage-side">
+          <TheyMaySay lines={stage.maySay} />
+          <SuggestBox {...suggestion} onAsk={askAi} />
+        </div>
         <TapOptions taps={stage.taps} selected={entry.tap} onTap={tap} />
       </div>
 

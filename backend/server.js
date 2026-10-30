@@ -6,6 +6,8 @@ import { pathToFileURL } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import { guide } from './stages.js';
+import { buildSuggestContext } from './llm.js';
+import { aggregateStats } from './stats.js';
 import * as v from './validate.js';
 import { HttpError } from './validate.js';
 
@@ -71,7 +73,13 @@ export function createApp({ db, llm, config = {} }) {
   // ok is true whenever the process answers; db/llm report dependencies.
   // Never calls the LLM: health checks run often and must stay free and fast.
   app.get('/health', async (req, res) => {
-    res.json({ ok: true, db: await db.ping(), llm: llm.configured, time: new Date().toISOString() });
+    res.json({
+      ok: true,
+      db: await db.ping(),
+      llm: llm.configured,
+      llm_model: llm.configured ? llm.model : null, // model name only, never the key
+      time: new Date().toISOString(),
+    });
   });
 
   app.get('/stages', (req, res) => res.json(guide));
@@ -82,7 +90,11 @@ export function createApp({ db, llm, config = {} }) {
   });
 
   app.get('/calls', async (req, res) => {
-    res.json({ calls: await db.listCalls(v.listLimit(req.query)) });
+    res.json({ calls: await db.listCalls(v.listQuery(req.query)) });
+  });
+
+  app.get('/stats', async (req, res) => {
+    res.json(aggregateStats(await db.statsData()));
   });
 
   app.get('/calls/:id', async (req, res) => {
@@ -107,6 +119,16 @@ export function createApp({ db, llm, config = {} }) {
     const call = await findCall(req.params.id);
     const stages = await db.getStages(call.id);
     res.json(await llm.draft(call, stages, outcome));
+  });
+
+  // Mid-call "Ask AI". Saves nothing, and works on closed calls too (reviewing
+  // an old call). The body is validated like a stage save, but the tap/words in
+  // it may not be saved yet, so they override the saved row for this stage.
+  app.post('/calls/:id/suggest', async (req, res) => {
+    const input = v.stageSave(req.body);
+    const call = await findCall(req.params.id);
+    const stages = await db.getStages(call.id);
+    res.json(await llm.suggest(buildSuggestContext(input.stage_no, stages, input)));
   });
 
   app.post('/calls/:id/close', async (req, res) => {
@@ -139,9 +161,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const { createLlm } = await import('./llm.js');
   const env = process.env;
 
+  const llm = createLlm({ baseUrl: env.LLM_BASE_URL, apiKey: env.LLM_API_KEY, model: env.LLM_MODEL });
   const app = createApp({
     db: createDb({ url: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_KEY }),
-    llm: createLlm({ baseUrl: env.LLM_BASE_URL, apiKey: env.LLM_API_KEY, model: env.LLM_MODEL }),
+    llm,
     config: {
       corsOrigins: env.CORS_ORIGINS,
       apiKey: env.API_KEY,
@@ -151,7 +174,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const port = Number(env.PORT) || 3000;
   // Log which features are on, never the values.
   app.listen(port, () => console.log(JSON.stringify({
-    msg: 'listening', port, llm: Boolean(env.LLM_BASE_URL && env.LLM_API_KEY && env.LLM_MODEL),
+    msg: 'listening', port, llm: llm.configured,
     apiKey: Boolean(env.API_KEY), dev: env.NODE_ENV !== 'production',
   })));
 }

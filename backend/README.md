@@ -1,18 +1,21 @@
 # Call Guide backend
 
-Express API for the cold-call guide. Data in Supabase, call record drafted by an
-OpenAI-compatible LLM. The contract is `../shared/API.md`.
+Express API for the cold-call guide. Data in Supabase; call record and mid-call
+suggestions from an OpenAI-compatible LLM (Groq by default). The contract is `../shared/API.md`.
 
-Files: `server.js` (routes), `db.js` (Supabase queries), `llm.js` (summary + fallback),
-`validate.js` (request checks), `stages.js` (loads `stages.json`).
+Files: `server.js` (routes), `db.js` (Supabase queries), `llm.js` (summary + suggest,
+with fallbacks), `stats.js` (counts for `/stats`), `validate.js` (request checks),
+`stages.js` (loads `stages.json`).
 
 ## Env vars
 
 | Var | Required | Notes |
 |---|---|---|
-| `SUPABASE_URL` | yes | |
+| `SUPABASE_URL` | yes | if missing, the server still boots: `/health` says `db: false`, data routes return 503 |
 | `SUPABASE_SERVICE_KEY` | yes | service-role key, server only |
-| `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | no | if any is missing, `/summary` returns the tap-based fallback |
+| `LLM_API_KEY` | no | turns the LLM on. Free key: console.groq.com -> API Keys. Without it `/summary` returns the tap-based fallback and `/suggest` the static stage purpose |
+| `LLM_BASE_URL` | no | default `https://api.groq.com/openai/v1`; any OpenAI-compatible API |
+| `LLM_MODEL` | no | default `llama-3.3-70b-versatile`; shown in `/health` as `llm_model` |
 | `CORS_ORIGINS` | yes in prod | comma-separated exact origins; add the literal `*.vercel.app` to allow preview URLs |
 | `NODE_ENV` | no | anything but `production` also allows `http://localhost:5173` |
 | `API_KEY` | no | if set, all routes except `/health` and `/stages` need header `x-api-key` |
@@ -39,6 +42,9 @@ New Web Service from the repo:
 - Start Command: `npm start`
 - Health Check Path: `/health`
 - Env: the vars above, with `NODE_ENV=production`
+
+Logs are one JSON line per request (method, path, status, ms). Request bodies,
+query strings and env values are never logged.
 
 Free tier sleeps when idle; the first request after a nap takes ~30-50s.
 Run `../supabase/schema.sql` once in the Supabase SQL editor before first use.

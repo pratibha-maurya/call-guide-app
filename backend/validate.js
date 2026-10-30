@@ -92,3 +92,19 @@ export function listLimit(query = {}) {
   if (Number.isNaN(n)) return 50;
   return Math.min(Math.max(n, 1), 200);
 }
+
+const STATUSES = ['in_progress', 'closed'];
+
+// GET /calls?q=&status=&limit=. Repeated params (?q=a&q=b) arrive as arrays
+// and are rejected rather than silently picking one.
+export function listQuery(query = {}) {
+  const { q, status } = query;
+  if (q !== undefined && typeof q !== 'string') throw bad('q must be a single string');
+  const term = q?.trim() || null;
+  if (term && term.length > 100) throw bad('q must be at most 100 characters');
+
+  if (status !== undefined && !STATUSES.includes(status)) {
+    throw bad(`status must be one of: ${STATUSES.join(', ')}`);
+  }
+  return { limit: listLimit(query), q: term, status: status ?? null };
+}

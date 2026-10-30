@@ -1,11 +1,11 @@
-// Drafted summary (editable) plus the mismatch flag, if the backend raised one.
+// Call notes: prefilled with the drafted summary (editable) plus the mismatch flag, if the backend raised one.
 export default function SummaryBox({ status, hasOutcome, summary, flag, source, onChange }) {
   const sourceLabel = source === 'llm' ? 'Drafted by AI' : source ? 'Auto summary' : null;
 
   return (
     <div className="summary">
       <div className="summary-head">
-        <label htmlFor="summary" className="section-label">Summary</label>
+        <label htmlFor="summary" className="section-label">Call notes</label>
         {status === 'loading' && <span className="summary-tag" role="status">Drafting...</span>}
         {status !== 'loading' && sourceLabel && <span className="summary-tag">{sourceLabel}</span>}
       </div>

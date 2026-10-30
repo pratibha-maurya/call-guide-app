@@ -8,12 +8,15 @@ const TEXT = {
 };
 
 export default function HealthDot() {
-  const status = useHealth();
-  const label = usingMock ? `${TEXT[status]} (mock)` : TEXT[status];
+  const { status, llm, model } = useHealth();
+  const server = usingMock ? `${TEXT[status]} (mock)` : TEXT[status];
+  const ai = usingMock ? 'AI: mock' : llm ? `AI on · ${model ?? 'model'}` : 'AI off';
+
   return (
-    <span className={`health health-${status}`} role="status" title={label}>
+    <span className={`health health-${status}`} role="status" title={`${server}. ${ai}`}>
       <span className="health-dot" aria-hidden="true" />
-      <span className="health-text">{label}</span>
+      <span className="health-text">{server}</span>
+      {status === 'ok' && <span className={`health-ai${llm ? ' is-on' : ''}`}>{ai}</span>}
     </span>
   );
 }

@@ -1,17 +1,17 @@
 import { useStages } from '../../lib/StagesContext.jsx';
 
-// How many calls stopped at each stage. Plain CSS bars, scaled to the busiest stage.
-export default function WhereCallsEnd({ calls }) {
+// How many calls stopped at each stage (stats.by_stage). Plain CSS bars, scaled to the busiest stage.
+export default function WhereCallsEnd({ byStage, total }) {
   const { stages } = useStages();
-  const counts = stages.map((s) => calls.filter((c) => c.stage_reached === s.no).length);
+  const counts = stages.map((s) => byStage?.[s.no] ?? 0);
   const max = Math.max(1, ...counts);
   const peak = counts.indexOf(Math.max(...counts));
 
   return (
-    <figure className="ends" aria-labelledby="ends-title">
+    <figure className="ends panel" id="where-calls-end" aria-labelledby="ends-title">
       <figcaption id="ends-title" className="ends-title">
         Where calls end
-        <span className="ends-sub">{calls.length} calls, by the last stage reached</span>
+        <span className="ends-sub">{total} calls, by the last stage reached</span>
       </figcaption>
       <ol className="ends-bars">
         {stages.map((s, i) => (

@@ -1,5 +1,5 @@
 // Real HTTP client for the Render backend. See shared/API.md for the contract.
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const API_KEY = import.meta.env.VITE_API_KEY;
 
 async function request(path, { method = 'GET', body } = {}) {
@@ -29,5 +29,16 @@ export const draftSummary = (callId, body) =>
   request(`/calls/${callId}/summary`, { method: 'POST', body });
 export const closeCall = (callId, body) =>
   request(`/calls/${callId}/close`, { method: 'POST', body });
-export const listCalls = (limit = 50) => request(`/calls?limit=${limit}`);
 export const getCall = (callId) => request(`/calls/${callId}`);
+
+// v2
+// listCalls({ limit, q, status }) - status is 'closed' | 'in_progress' | undefined (all)
+export function listCalls({ limit = 50, q, status } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (q) params.set('q', q);
+  if (status) params.set('status', status);
+  return request(`/calls?${params}`);
+}
+export const getStats = () => request('/stats');
+export const suggest = (callId, body) =>
+  request(`/calls/${callId}/suggest`, { method: 'POST', body });

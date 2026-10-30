@@ -1,6 +1,7 @@
 // In-memory stand-in for db.js with the same function names, so the tests
 // exercise the real routes and validation without a Supabase project.
 import { randomUUID } from 'node:crypto';
+import { SEARCH_COLUMNS } from '../db.js';
 
 export function createFakeDb() {
   const calls = new Map();
@@ -53,14 +54,27 @@ export function createFakeDb() {
       return { ...call };
     },
 
-    async listCalls(limit) {
+    // Plain substring match: the fake has no LIKE, so %, _ and \ are literal here
+    // just as the escaped PostgREST filter makes them in db.js.
+    async listCalls({ limit, q = null, status = null }) {
+      const needle = q?.toLowerCase();
+      const matches = (c) => SEARCH_COLUMNS.some((col) => c[col]?.toLowerCase().includes(needle));
       return [...calls.values()]
+        .filter((c) => !status || c.status === status)
+        .filter((c) => !needle || matches(c))
         .sort((a, b) => b.started_at.localeCompare(a.started_at))
         .slice(0, limit)
         .map((c) => ({
           ...c,
           need_words: stages.find((s) => s.call_id === c.id && s.stage_no === 5)?.prospect_words ?? null,
         }));
+    },
+
+    async statsData() {
+      return {
+        calls: [...calls.values()].map(({ id, status, stage_reached, outcome }) => ({ id, status, stage_reached, outcome })),
+        withNeedWords: stages.filter((s) => s.stage_no === 5 && s.prospect_words).length,
+      };
     },
   };
 }

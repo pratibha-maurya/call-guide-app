@@ -19,6 +19,24 @@ Validation: `stage_no` 1..8; `tap` must be a key from that stage's `taps`; `outc
 
 `call` shape: `{ id, prospect_name, prospect_role, company, status, stage_reached, outcome, next_step, summary, outcome_flag, started_at, ended_at }`.
 
+## Additions (v2)
+
+| Method | Path | Body / query | Returns |
+|---|---|---|---|
+| GET | `/calls` | `?q=<text>&status=in_progress|closed&limit=50` | as before; `q` matches prospect_name, company, prospect_role (case-insensitive substring) |
+| GET | `/stats` | - | `{ total, closed, in_progress, by_stage: {1..8: n}, by_outcome: {key: n}, with_need_words }` (by_stage counts stage_reached of all calls) |
+| POST | `/calls/:id/suggest` | `{ stage_no, tap?, prospect_words? }` | `{ say, follow_up, source: "llm"|"static", model? }` - nothing saved |
+
+`/suggest` is the mid-call "Ask AI" button. LLM gets the stage (name, purpose, maySay), the
+call so far (taps + words of earlier stages), the current tap and words. Returns JSON
+`say` (one or two sentences the caller could say next, plain spoken English, no sales
+clichés) and `follow_up` (one question to ask). On missing key / error / timeout (8s):
+`source: "static"`, `say` = the stage purpose, `follow_up` = null. The frontend must label
+static results as "Static guidance - AI unavailable", never as AI.
+
+LLM env defaults: `LLM_BASE_URL` defaults to `https://api.groq.com/openai/v1`, `LLM_MODEL` to
+`llama-3.3-70b-versatile`; only `LLM_API_KEY` is required. `/health` adds `llm_model`.
+
 ## LLM (summary endpoint)
 OpenAI-compatible chat completions, configured by env:
 `LLM_BASE_URL` (e.g. https://api.groq.com/openai/v1), `LLM_API_KEY`, `LLM_MODEL`.
