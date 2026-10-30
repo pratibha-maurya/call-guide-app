@@ -8,8 +8,24 @@ function unwrap({ data, error }) {
   return data;
 }
 
+// Used when Supabase env vars are missing: the server still boots, /health
+// reports db:false, and every data route answers 503 instead of crashing.
+function unconfiguredDb() {
+  const fail = async () => {
+    const err = new Error('database not configured');
+    err.status = 503;
+    throw err;
+  };
+  return new Proxy({ ping: async () => false }, {
+    get: (target, prop) => (prop in target ? target[prop] : fail),
+  });
+}
+
 export function createDb({ url, serviceKey }) {
-  if (!url || !serviceKey) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY are required');
+  if (!url || !serviceKey) {
+    console.warn(JSON.stringify({ level: 'warn', msg: 'SUPABASE_URL / SUPABASE_SERVICE_KEY missing; data routes return 503' }));
+    return unconfiguredDb();
+  }
   // Service-role key: bypasses RLS. It must only ever live on the server.
   const sb = createClient(url, serviceKey, { auth: { persistSession: false } });
 

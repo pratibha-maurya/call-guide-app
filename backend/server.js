@@ -122,6 +122,7 @@ export function createApp({ db, llm, config = {} }) {
   app.use((err, req, res, next) => {
     // HttpError from our code, or body-parser errors (bad JSON = 400, too large = 413).
     const status = err.status ?? err.statusCode ?? 500;
+    if (status === 503) return res.status(503).json({ error: err.message });
     if (status >= 500) {
       console.error(JSON.stringify({ level: 'error', path: req.path, msg: err.message }));
       return res.status(500).json({ error: 'internal error' });
