@@ -13,10 +13,11 @@ export default function ConfigError() {
       </header>
       <div className="config-error" role="alert">
         <div className="config-error-inner">
-          <p className="config-error-title">Backend not configured</p>
+          <p className="config-error-title">App not configured</p>
           <p>
-            <code>VITE_API_URL</code> is not set. Create <code>frontend/.env</code> with{' '}
-            <code>VITE_API_URL=http://localhost:3000</code> and restart <code>npm run dev</code>.
+            <code>VITE_API_URL</code>, <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>{' '}
+            must all be set. Add them to <code>frontend/.env</code> (see <code>.env.example</code>) and restart{' '}
+            <code>npm run dev</code>.
           </p>
           <p className="config-error-sub">
             Vite reads <code>.env</code> only at startup, and the file must sit in <code>frontend/</code> next to{' '}

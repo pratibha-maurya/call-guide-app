@@ -19,6 +19,7 @@
     "express": "^5.3.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13",
     "supertest": "^7.3.1"
   }
 }

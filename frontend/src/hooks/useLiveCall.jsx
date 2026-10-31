@@ -8,16 +8,16 @@ import { clearLiveCall, loadLiveCall, saveLiveCall } from '../lib/storage.js';
 
 const LiveCallContext = createContext(null);
 
-function restore() {
-  const saved = loadLiveCall();
+function restore(userId) {
+  const saved = loadLiveCall(userId);
   if (saved?.call && (saved.phase === 'live' || saved.phase === 'closing')) {
     return { ...initialState, ...saved };
   }
   return initialState;
 }
 
-export function LiveCallProvider({ children }) {
-  const [state, dispatch] = useReducer(callReducer, undefined, restore);
+export function LiveCallProvider({ userId, children }) {
+  const [state, dispatch] = useReducer(callReducer, userId, restore);
   const [toast, setToast] = useState(null); // { message, retry? }
   const [inFlight, setInFlight] = useState(0); // saves waiting for the server
   const [savedOnce, setSavedOnce] = useState(false);
@@ -29,9 +29,9 @@ export function LiveCallProvider({ children }) {
 
   // Mirror the in-progress call so a refresh resumes it.
   useEffect(() => {
-    if (state.phase === 'live' || state.phase === 'closing') saveLiveCall(state);
-    else clearLiveCall();
-  }, [state]);
+    if (state.phase === 'live' || state.phase === 'closing') saveLiveCall(userId, state);
+    else clearLiveCall(userId);
+  }, [state, userId]);
 
   const saveStage = useCallback(async (stageNo) => {
     const { call } = stateRef.current;

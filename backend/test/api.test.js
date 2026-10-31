@@ -4,29 +4,32 @@ import request from 'supertest';
 import { createApp } from '../server.js';
 import { createLlm, parseReply, parseSuggestion, DEFAULT_BASE_URL, DEFAULT_MODEL } from '../llm.js';
 import { createDb, searchFilter } from '../db.js';
-import { createFakeDb } from './fake-db.js';
+import { createFakeDb, createFakeAuth } from './fake-db.js';
 
 // Silence per-request logs during tests.
 console.log = () => {};
 console.warn = () => {};
 
 const noLlm = createLlm({}); // no env -> always the fallback
+const auth = createFakeAuth();
 let db;
 let app;
+// Logged in as one user. Login itself is tested in auth.test.js.
+const api = () => request.agent(app).set('authorization', 'Bearer token-a');
 
 beforeEach(() => {
   db = createFakeDb();
-  app = createApp({ db, llm: noLlm });
+  app = createApp({ db, auth, llm: noLlm });
 });
 
 async function newCall(name = 'Ravi Kumar') {
-  const res = await request(app).post('/calls').send({ prospect_name: name, company: 'Acme' });
+  const res = await api().post('/calls').send({ prospect_name: name, company: 'Acme' });
   return res.body.call;
 }
-const saveStage = (id, body) => request(app).post(`/calls/${id}/stages`).send(body);
+const saveStage = (id, body) => api().post(`/calls/${id}/stages`).send(body);
 
 test('GET /health reports process, db and llm status', async () => {
-  const res = await request(app).get('/health').expect(200);
+  const res = await api().get('/health').expect(200);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.db, true);
   assert.equal(res.body.llm, false);
@@ -35,14 +38,14 @@ test('GET /health reports process, db and llm status', async () => {
 });
 
 test('GET /stages returns the guide', async () => {
-  const res = await request(app).get('/stages').expect(200);
+  const res = await api().get('/stages').expect(200);
   assert.equal(res.body.stages.length, 8);
   assert.ok(res.body.outcomes.length > 0);
 });
 
 describe('POST /calls', () => {
   test('creates a call with trimmed fields', async () => {
-    const res = await request(app).post('/calls')
+    const res = await api().post('/calls')
       .send({ prospect_name: '  Ravi  ', prospect_role: ' CFO ', company: '' }).expect(201);
     assert.equal(res.body.call.prospect_name, 'Ravi');
     assert.equal(res.body.call.prospect_role, 'CFO');
@@ -51,12 +54,12 @@ describe('POST /calls', () => {
   });
 
   test('requires prospect_name', async () => {
-    const res = await request(app).post('/calls').send({ prospect_name: '   ' }).expect(400);
+    const res = await api().post('/calls').send({ prospect_name: '   ' }).expect(400);
     assert.match(res.body.error, /prospect_name/);
   });
 
   test('rejects malformed JSON with 400', async () => {
-    await request(app).post('/calls').set('content-type', 'application/json').send('{bad').expect(400);
+    await api().post('/calls').set('content-type', 'application/json').send('{bad').expect(400);
   });
 });
 
@@ -93,14 +96,14 @@ describe('POST /calls/:id/stages', () => {
     assert.equal(res.body.stage.tap, 'named_goal'); // untouched field kept
     assert.equal(db.stages.filter((s) => s.stage_no === 5).length, 1);
 
-    const detail = await request(app).get(`/calls/${id}`).expect(200);
+    const detail = await api().get(`/calls/${id}`).expect(200);
     assert.deepEqual(detail.body.stages.map((s) => s.stage_no), [3, 5]);
     assert.equal(detail.body.stages[1].prospect_words, 'Enter the US market');
   });
 
   test('409 when the call is closed', async () => {
     const { id } = await newCall();
-    await request(app).post(`/calls/${id}/close`).send({ outcome: 'dropped', stage_no: 2 }).expect(200);
+    await api().post(`/calls/${id}/close`).send({ outcome: 'dropped', stage_no: 2 }).expect(200);
     await saveStage(id, { stage_no: 3 }).expect(409);
   });
 });
@@ -108,16 +111,16 @@ describe('POST /calls/:id/stages', () => {
 describe('POST /calls/:id/close', () => {
   test('validates outcome', async () => {
     const { id } = await newCall();
-    const res = await request(app).post(`/calls/${id}/close`).send({ outcome: 'sold', stage_no: 7 }).expect(400);
+    const res = await api().post(`/calls/${id}/close`).send({ outcome: 'sold', stage_no: 7 }).expect(400);
     assert.match(res.body.error, /outcome/);
-    await request(app).post(`/calls/${id}/close`).send({ stage_no: 7 }).expect(400);
-    await request(app).post(`/calls/${id}/close`).send({ outcome: 'dropped' }).expect(400);
+    await api().post(`/calls/${id}/close`).send({ stage_no: 7 }).expect(400);
+    await api().post(`/calls/${id}/close`).send({ outcome: 'dropped' }).expect(400);
   });
 
   test('closes and stores where the call ended', async () => {
     const { id } = await newCall();
     await saveStage(id, { stage_no: 7, tap: 'send_document' });
-    const res = await request(app).post(`/calls/${id}/close`).send({
+    const res = await api().post(`/calls/${id}/close`).send({
       outcome: 'document_sent', stage_no: 6, next_step: ' WhatsApp deck today ',
       summary: 'Asked for a deck.', outcome_flag: 'Check this.',
     }).expect(200);
@@ -132,7 +135,7 @@ describe('POST /calls/:id/close', () => {
   });
 
   test('404 for unknown call', async () => {
-    await request(app).post('/calls/00000000-0000-4000-8000-000000000000/close')
+    await api().post('/calls/00000000-0000-4000-8000-000000000000/close')
       .send({ outcome: 'dropped', stage_no: 1 }).expect(404);
   });
 });
@@ -143,13 +146,13 @@ test('GET /calls includes need_words and respects limit', async () => {
   await saveStage(a.id, { stage_no: 5, prospect_words: 'We want to export' });
   await saveStage(a.id, { stage_no: 6, prospect_words: 'not this one' });
 
-  const res = await request(app).get('/calls').expect(200);
+  const res = await api().get('/calls').expect(200);
   assert.equal(res.body.calls.length, 2);
   const byName = Object.fromEntries(res.body.calls.map((c) => [c.prospect_name, c]));
   assert.equal(byName.A.need_words, 'We want to export');
   assert.equal(byName.B.need_words, null);
 
-  const limited = await request(app).get('/calls?limit=1').expect(200);
+  const limited = await api().get('/calls?limit=1').expect(200);
   assert.equal(limited.body.calls.length, 1);
 });
 
@@ -159,7 +162,7 @@ describe('POST /calls/:id/summary', () => {
     await saveStage(id, { stage_no: 5, tap: 'named_goal', prospect_words: 'We want to export' });
     await saveStage(id, { stage_no: 6, tap: 'send_in_writing' });
 
-    const res = await request(app).post(`/calls/${id}/summary`).expect(200);
+    const res = await api().post(`/calls/${id}/summary`).expect(200);
     assert.deepEqual(res.body, {
       summary: "Reached Stage 6 Objection. Need: 'We want to export'. Objection: Send in writing.",
       suggested_outcome: 'document_sent',
@@ -172,7 +175,7 @@ describe('POST /calls/:id/summary', () => {
 
   test('rejects an unknown outcome in the body', async () => {
     const { id } = await newCall();
-    await request(app).post(`/calls/${id}/summary`).send({ outcome: 'sold' }).expect(400);
+    await api().post(`/calls/${id}/summary`).send({ outcome: 'sold' }).expect(400);
   });
 
   test('uses a mocked LLM reply wrapped in code fences', async () => {
@@ -184,11 +187,11 @@ describe('POST /calls/:id/summary', () => {
       return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
     };
     const llm = createLlm({ baseUrl: 'https://llm.test/v1/', apiKey: 'k', model: 'm', fetch: fakeFetch });
-    app = createApp({ db, llm });
+    app = createApp({ db, auth, llm });
 
     const { id } = await newCall();
     await saveStage(id, { stage_no: 5, tap: 'named_goal', prospect_words: 'We want to export' });
-    const res = await request(app).post(`/calls/${id}/summary`).send({ outcome: 'meeting_booked' }).expect(200);
+    const res = await api().post(`/calls/${id}/summary`).send({ outcome: 'meeting_booked' }).expect(200);
 
     assert.equal(res.body.source, 'llm');
     assert.equal(res.body.summary, 'Line 1.\nLine 2.');
@@ -210,9 +213,9 @@ describe('POST /calls/:id/summary', () => {
       async () => new Response(JSON.stringify({ choices: [{ message: { content: 'Sure! Here you go.' } }] })),
       async () => { throw new Error('network down'); },
     ]) {
-      app = createApp({ db, llm: createLlm({ baseUrl: 'https://x/v1', apiKey: 'k', model: 'm', fetch: fakeFetch }) });
+      app = createApp({ db, auth, llm: createLlm({ baseUrl: 'https://x/v1', apiKey: 'k', model: 'm', fetch: fakeFetch }) });
       const { id } = await newCall();
-      const res = await request(app).post(`/calls/${id}/summary`).expect(200);
+      const res = await api().post(`/calls/${id}/summary`).expect(200);
       assert.equal(res.body.source, 'fallback');
     }
   });
@@ -228,25 +231,25 @@ test('parseReply validates keys', () => {
 
 describe('x-api-key', () => {
   beforeEach(() => {
-    app = createApp({ db, llm: noLlm, config: { apiKey: 'secret' } });
+    app = createApp({ db, auth, llm: noLlm, config: { apiKey: 'secret' } });
   });
 
   test('/health and /stages stay open', async () => {
-    await request(app).get('/health').expect(200);
-    await request(app).get('/stages').expect(200);
+    await api().get('/health').expect(200);
+    await api().get('/stages').expect(200);
   });
 
   test('other routes need the key', async () => {
-    await request(app).get('/calls').expect(401);
-    await request(app).get('/calls').set('x-api-key', 'wrong').expect(401);
-    await request(app).get('/calls').set('x-api-key', 'secret').expect(200);
-    await request(app).post('/calls').send({ prospect_name: 'A' }).expect(401);
+    await api().get('/calls').expect(401);
+    await api().get('/calls').set('x-api-key', 'wrong').expect(401);
+    await api().get('/calls').set('x-api-key', 'secret').expect(200);
+    await api().post('/calls').send({ prospect_name: 'A' }).expect(401);
   });
 });
 
 describe('CORS', () => {
   test('allows listed origins, vercel previews only when opted in, localhost in dev', async () => {
-    const make = (config) => createApp({ db, llm: noLlm, config });
+    const make = (config) => createApp({ db, auth, llm: noLlm, config });
     const allowed = async (a, origin) =>
       (await request(a).get('/health').set('Origin', origin)).headers['access-control-allow-origin'] === origin;
 
@@ -266,47 +269,47 @@ describe('CORS', () => {
 
 describe('GET /calls search and status', () => {
   async function seed() {
-    const mk = (body) => request(app).post('/calls').send(body).then((r) => r.body.call);
+    const mk = (body) => api().post('/calls').send(body).then((r) => r.body.call);
     const ravi = await mk({ prospect_name: 'Ravi Kumar', company: 'Acme Exports', prospect_role: 'CFO' });
     const meera = await mk({ prospect_name: 'Meera', company: '100% Cotton (India), Ltd_' });
     const arjun = await mk({ prospect_name: 'Arjun', prospect_role: 'Head of Growth' });
-    await request(app).post(`/calls/${meera.id}/close`).send({ outcome: 'dropped', stage_no: 1 }).expect(200);
+    await api().post(`/calls/${meera.id}/close`).send({ outcome: 'dropped', stage_no: 1 }).expect(200);
     return { ravi, meera, arjun };
   }
   const names = (res) => res.body.calls.map((c) => c.prospect_name).sort();
 
   test('q matches name, company and role, case-insensitive, trimmed', async () => {
     await seed();
-    assert.deepEqual(names(await request(app).get('/calls?q=%20%20ravi%20').expect(200)), ['Ravi Kumar']);
-    assert.deepEqual(names(await request(app).get('/calls?q=EXPORTS').expect(200)), ['Ravi Kumar']);
-    assert.deepEqual(names(await request(app).get('/calls?q=growth').expect(200)), ['Arjun']);
-    assert.deepEqual(names(await request(app).get('/calls?q=').expect(200)), ['Arjun', 'Meera', 'Ravi Kumar']);
+    assert.deepEqual(names(await api().get('/calls?q=%20%20ravi%20').expect(200)), ['Ravi Kumar']);
+    assert.deepEqual(names(await api().get('/calls?q=EXPORTS').expect(200)), ['Ravi Kumar']);
+    assert.deepEqual(names(await api().get('/calls?q=growth').expect(200)), ['Arjun']);
+    assert.deepEqual(names(await api().get('/calls?q=').expect(200)), ['Arjun', 'Meera', 'Ravi Kumar']);
   });
 
   test('special characters are matched literally', async () => {
     await seed();
     for (const q of ['100%', '(India),', 'Ltd_']) {
-      const res = await request(app).get('/calls').query({ q }).expect(200);
+      const res = await api().get('/calls').query({ q }).expect(200);
       assert.deepEqual(names(res), ['Meera'], q);
     }
-    assert.deepEqual(names(await request(app).get('/calls').query({ q: '%' }).expect(200)), ['Meera']);
+    assert.deepEqual(names(await api().get('/calls').query({ q: '%' }).expect(200)), ['Meera']);
   });
 
   test('status filters and combines with q', async () => {
     await seed();
-    assert.deepEqual(names(await request(app).get('/calls?status=closed').expect(200)), ['Meera']);
-    assert.deepEqual(names(await request(app).get('/calls?status=in_progress').expect(200)), ['Arjun', 'Ravi Kumar']);
-    assert.deepEqual(names(await request(app).get('/calls?status=in_progress&q=meera').expect(200)), []);
+    assert.deepEqual(names(await api().get('/calls?status=closed').expect(200)), ['Meera']);
+    assert.deepEqual(names(await api().get('/calls?status=in_progress').expect(200)), ['Arjun', 'Ravi Kumar']);
+    assert.deepEqual(names(await api().get('/calls?status=in_progress&q=meera').expect(200)), []);
   });
 
   test('400 for invalid status or q', async () => {
-    let res = await request(app).get('/calls?status=open').expect(400);
+    let res = await api().get('/calls?status=open').expect(400);
     assert.match(res.body.error, /status must be one of/);
-    await request(app).get('/calls?status=closed&status=in_progress').expect(400);
-    res = await request(app).get('/calls').query({ q: 'x'.repeat(101) }).expect(400);
+    await api().get('/calls?status=closed&status=in_progress').expect(400);
+    res = await api().get('/calls').query({ q: 'x'.repeat(101) }).expect(400);
     assert.match(res.body.error, /q must be at most 100/);
-    await request(app).get('/calls').query({ q: 'x'.repeat(100) }).expect(200);
-    await request(app).get('/calls?q=a&q=b').expect(400);
+    await api().get('/calls').query({ q: 'x'.repeat(100) }).expect(200);
+    await api().get('/calls?q=a&q=b').expect(400);
   });
 });
 
@@ -324,7 +327,7 @@ test('searchFilter escapes LIKE wildcards and PostgREST reserved characters', ()
 
 describe('GET /stats', () => {
   test('all stage and outcome keys present, zeros included', async () => {
-    let res = await request(app).get('/stats').expect(200);
+    let res = await api().get('/stats').expect(200);
     assert.deepEqual(res.body.by_stage, { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0 });
     assert.deepEqual(Object.keys(res.body.by_outcome).sort(),
       ['callback_scheduled', 'document_sent', 'dropped', 'meeting_booked', 'not_interested', 'referred', 'wrong_contact']);
@@ -336,9 +339,9 @@ describe('GET /stats', () => {
     await newCall('C');
     await saveStage(a.id, { stage_no: 5, tap: 'named_goal', prospect_words: 'Export to the US' });
     await saveStage(b.id, { stage_no: 5, tap: 'named_goal' }); // no words: not counted
-    await request(app).post(`/calls/${b.id}/close`).send({ outcome: 'document_sent', stage_no: 6 }).expect(200);
+    await api().post(`/calls/${b.id}/close`).send({ outcome: 'document_sent', stage_no: 6 }).expect(200);
 
-    res = await request(app).get('/stats').expect(200);
+    res = await api().get('/stats').expect(200);
     assert.equal(res.body.total, 3);
     assert.equal(res.body.closed, 1);
     assert.equal(res.body.in_progress, 2);
@@ -349,15 +352,15 @@ describe('GET /stats', () => {
   });
 
   test('needs x-api-key when API_KEY is set', async () => {
-    app = createApp({ db, llm: noLlm, config: { apiKey: 'secret' } });
-    await request(app).get('/stats').expect(401);
-    await request(app).get('/stats').set('x-api-key', 'secret').expect(200);
+    app = createApp({ db, auth, llm: noLlm, config: { apiKey: 'secret' } });
+    await api().get('/stats').expect(401);
+    await api().get('/stats').set('x-api-key', 'secret').expect(200);
   });
 });
 
 describe('POST /calls/:id/suggest', () => {
-  const suggest = (id, body) => request(app).post(`/calls/${id}/suggest`).send(body);
-  const stage6Purpose = () => request(app).get('/stages').then((r) => r.body.stages[5].purpose);
+  const suggest = (id, body) => api().post(`/calls/${id}/suggest`).send(body);
+  const stage6Purpose = () => api().get('/stages').then((r) => r.body.stages[5].purpose);
 
   test('static fallback without an LLM key, nothing saved', async () => {
     const { id } = await newCall();
@@ -372,7 +375,7 @@ describe('POST /calls/:id/suggest', () => {
     await suggest(id, { stage_no: 1, tap: 'meeting' }).expect(400);
     await suggest('00000000-0000-4000-8000-000000000000', { stage_no: 1 }).expect(404);
     await suggest('nope', { stage_no: 1 }).expect(404);
-    await request(app).post(`/calls/${id}/close`).send({ outcome: 'dropped', stage_no: 2 }).expect(200);
+    await api().post(`/calls/${id}/close`).send({ outcome: 'dropped', stage_no: 2 }).expect(200);
     await suggest(id, { stage_no: 2 }).expect(200);
   });
 
@@ -383,7 +386,7 @@ describe('POST /calls/:id/suggest', () => {
       const content = 'Here you go:\n```json\n{"say":" Happy to. What should the note cover for you? ","follow_up":"Who else reads it?"}\n```';
       return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
     };
-    app = createApp({ db, llm: createLlm({ apiKey: 'k', fetch: fakeFetch }) });
+    app = createApp({ db, auth, llm: createLlm({ apiKey: 'k', fetch: fakeFetch }) });
 
     const { id } = await newCall();
     await saveStage(id, { stage_no: 5, tap: 'named_goal', prospect_words: 'We want to export' });
@@ -417,7 +420,7 @@ describe('POST /calls/:id/suggest', () => {
       async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"say": ""}' } }] })),
       async () => new Response(JSON.stringify({ choices: [{ message: { content: 'not json at all' } }] })),
     ]) {
-      app = createApp({ db, llm: createLlm({ apiKey: 'k', fetch: fakeFetch }) });
+      app = createApp({ db, auth, llm: createLlm({ apiKey: 'k', fetch: fakeFetch }) });
       const { id } = await newCall();
       const res = await suggest(id, { stage_no: 6 }).expect(200);
       assert.deepEqual(res.body, { say: purpose, follow_up: null, source: 'static' });
@@ -444,8 +447,8 @@ describe('LLM config', () => {
   });
 
   test('/health shows the model name, never the key', async () => {
-    app = createApp({ db, llm: createLlm({ apiKey: 'sk-secret-123' }) });
-    const res = await request(app).get('/health').expect(200);
+    app = createApp({ db, auth, llm: createLlm({ apiKey: 'sk-secret-123' }) });
+    const res = await api().get('/health').expect(200);
     assert.equal(res.body.llm, true);
     assert.equal(res.body.llm_model, DEFAULT_MODEL);
     assert.doesNotMatch(JSON.stringify(res.body), /sk-secret/);
@@ -454,15 +457,15 @@ describe('LLM config', () => {
 
 describe('without Supabase env', () => {
   test('boots; /health ok with db:false; data routes 503', async () => {
-    app = createApp({ db: createDb({}), llm: noLlm });
-    const health = await request(app).get('/health').expect(200);
+    app = createApp({ auth, db: createDb({}), llm: noLlm });
+    const health = await api().get('/health').expect(200);
     assert.equal(health.body.ok, true);
     assert.equal(health.body.db, false);
-    await request(app).get('/stages').expect(200);
-    const res = await request(app).get('/calls').expect(503);
+    await api().get('/stages').expect(200);
+    const res = await api().get('/calls').expect(503);
     assert.equal(res.body.error, 'database not configured');
-    await request(app).get('/stats').expect(503);
-    await request(app).get('/calls?q=ravi&status=closed').expect(503);
-    await request(app).post('/calls/00000000-0000-4000-8000-000000000000/suggest').send({ stage_no: 1 }).expect(503);
+    await api().get('/stats').expect(503);
+    await api().get('/calls?q=ravi&status=closed').expect(503);
+    await api().post('/calls/00000000-0000-4000-8000-000000000000/suggest').send({ stage_no: 1 }).expect(503);
   });
 });

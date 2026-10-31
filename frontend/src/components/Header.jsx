@@ -1,9 +1,12 @@
 import { NavLink } from 'react-router-dom';
 import HealthDot from './HealthDot.jsx';
+import { useAuth } from '../hooks/useAuth.jsx';
 import { useLiveCall } from '../hooks/useLiveCall.jsx';
+import { usingMock } from '../api/index.js';
 
 export default function Header() {
   const { state } = useLiveCall();
+  const { user, logout } = useAuth();
   const onCall = state.phase === 'live' || state.phase === 'closing';
 
   return (
@@ -26,6 +29,12 @@ export default function Header() {
           </NavLink>
         </nav>
         <HealthDot />
+        {!usingMock && (
+          <span className="account">
+            <span className="account-email" title={user.email}>{user.email}</span>
+            <button type="button" className="btn btn-small" onClick={logout}>Log out</button>
+          </span>
+        )}
       </div>
     </header>
   );

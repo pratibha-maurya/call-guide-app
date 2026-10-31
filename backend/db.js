@@ -11,14 +11,16 @@ function unwrap({ data, error }) {
 // Used when Supabase env vars are missing: the server still boots, /health
 // reports db:false, and every data route answers 503 instead of crashing.
 function unconfiguredDb() {
+  let stub;
   const fail = async () => {
     const err = new Error('database not configured');
     err.status = 503;
     throw err;
   };
-  return new Proxy({ ping: async () => false }, {
+  stub = new Proxy({ ping: async () => false, forUser: () => stub }, {
     get: (target, prop) => (prop in target ? target[prop] : fail),
   });
+  return stub;
 }
 
 // Columns GET /calls?q= searches.
@@ -37,89 +39,100 @@ export function searchFilter(term) {
   return SEARCH_COLUMNS.map((col) => `${col}.ilike.${quoted}`).join(',');
 }
 
-export function createDb({ url, serviceKey }) {
-  if (!url || !serviceKey) {
-    console.warn(JSON.stringify({ level: 'warn', msg: 'SUPABASE_URL / SUPABASE_SERVICE_KEY missing; data routes return 503' }));
+export function createDb({ url, publishableKey }) {
+  if (!url || !publishableKey) {
+    console.warn(JSON.stringify({ level: 'warn', msg: 'SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY missing; data routes return 503' }));
     return unconfiguredDb();
   }
-  // Service-role key: bypasses RLS. It must only ever live on the server.
-  const sb = createClient(url, serviceKey, { auth: { persistSession: false } });
 
   return {
-    // Cheapest possible round trip, with a hard 3s cap so /health stays fast.
+    // Needs no login, with a hard 3s cap so /health stays fast.
     async ping() {
       try {
-        const { error } = await sb.from('calls').select('id').limit(1)
-          .abortSignal(AbortSignal.timeout(3000));
-        return !error;
+        const res = await fetch(`${url}/auth/v1/health`, {
+          headers: { apikey: publishableKey },
+          signal: AbortSignal.timeout(3000),
+        });
+        return res.ok;
       } catch {
         return false;
       }
     },
 
-    async createCall(fields) {
-      return unwrap(await sb.from('calls').insert(fields).select().single());
-    },
+    // Queries as the logged-in user: the public key plus their token, never the
+    // service-role key, so RLS limits every query below to their own rows.
+    forUser(token, user) {
+      const sb = createClient(url, publishableKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
 
-    async getCall(id) {
-      return unwrap(await sb.from('calls').select().eq('id', id).maybeSingle());
-    },
+      return {
+        async createCall(fields) {
+          return unwrap(await sb.from('calls').insert({ ...fields, user_id: user.id }).select().single());
+        },
 
-    async getStages(callId) {
-      return unwrap(await sb.from('call_stages').select().eq('call_id', callId).order('stage_no'));
-    },
+        async getCall(id) {
+          return unwrap(await sb.from('calls').select().eq('id', id).maybeSingle());
+        },
 
-    // Upsert on the (call_id, stage_no) unique key. PostgREST only writes the
-    // columns present in the payload, so omitting `tap` keeps the saved tap.
-    async upsertStage(callId, { stage_no, ...fields }) {
-      const row = { call_id: callId, stage_no, ...fields, saved_at: new Date().toISOString() };
-      return unwrap(await sb.from('call_stages')
-        .upsert(row, { onConflict: 'call_id,stage_no' }).select().single());
-    },
+        async getStages(callId) {
+          return unwrap(await sb.from('call_stages').select().eq('call_id', callId).order('stage_no'));
+        },
 
-    // stage_reached = greatest(stage_reached, stageNo), done as a conditional
-    // update so two quick saves can never move it backwards.
-    async raiseStageReached(callId, stageNo) {
-      unwrap(await sb.from('calls').update({ stage_reached: stageNo })
-        .eq('id', callId).lt('stage_reached', stageNo));
-      return this.getCall(callId);
-    },
+        // Upsert on the (call_id, stage_no) unique key. PostgREST only writes the
+        // columns present in the payload, so omitting `tap` keeps the saved tap.
+        async upsertStage(callId, { stage_no, ...fields }) {
+          const row = { call_id: callId, stage_no, ...fields, saved_at: new Date().toISOString() };
+          return unwrap(await sb.from('call_stages')
+            .upsert(row, { onConflict: 'call_id,stage_no' }).select().single());
+        },
 
-    async closeCall(id, { outcome, stage_no, next_step, summary, outcome_flag }) {
-      return unwrap(await sb.from('calls').update({
-        status: 'closed',
-        ended_at: new Date().toISOString(),
-        stage_reached: stage_no, // where the call actually ended, may be lower
-        outcome, next_step, summary, outcome_flag,
-      }).eq('id', id).select().maybeSingle());
-    },
+        // stage_reached = greatest(stage_reached, stageNo), done as a conditional
+        // update so two quick saves can never move it backwards.
+        async raiseStageReached(callId, stageNo) {
+          unwrap(await sb.from('calls').update({ stage_reached: stageNo })
+            .eq('id', callId).lt('stage_reached', stageNo));
+          return this.getCall(callId);
+        },
 
-    // One query: embed only the stage-5 row of each call (no N+1).
-    // q and status are optional and already validated (validate.listQuery).
-    async listCalls({ limit, q = null, status = null }) {
-      let query = sb.from('calls')
-        .select('*, call_stages(prospect_words)')
-        .eq('call_stages.stage_no', 5);
-      if (status) query = query.eq('status', status);
-      if (q) query = query.or(searchFilter(q));
-      const rows = unwrap(await query.order('started_at', { ascending: false }).limit(limit));
-      return rows.map(({ call_stages, ...call }) => ({
-        ...call,
-        need_words: call_stages?.[0]?.prospect_words ?? null,
-      }));
-    },
+        async closeCall(id, { outcome, stage_no, next_step, summary, outcome_flag }) {
+          return unwrap(await sb.from('calls').update({
+            status: 'closed',
+            ended_at: new Date().toISOString(),
+            stage_reached: stage_no, // where the call actually ended, may be lower
+            outcome, next_step, summary, outcome_flag,
+          }).eq('id', id).select().maybeSingle());
+        },
 
-    // Raw rows for GET /stats; stats.js does the counting. Two small queries
-    // instead of a SQL view/RPC, so the schema stays as it is. Fine for a
-    // free-tier project with at most a few thousand calls (capped at 5000).
-    async statsData() {
-      const calls = unwrap(await sb.from('calls')
-        .select('id, status, stage_reached, outcome').limit(5000));
-      const { count, error } = await sb.from('call_stages')
-        .select('id', { count: 'exact', head: true })
-        .eq('stage_no', 5).not('prospect_words', 'is', null).neq('prospect_words', '');
-      if (error) throw new Error(`db: ${error.message}`);
-      return { calls, withNeedWords: count ?? 0 };
+        // One query: embed only the stage-5 row of each call (no N+1).
+        // q and status are optional and already validated (validate.listQuery).
+        async listCalls({ limit, q = null, status = null }) {
+          let query = sb.from('calls')
+            .select('*, call_stages(prospect_words)')
+            .eq('call_stages.stage_no', 5);
+          if (status) query = query.eq('status', status);
+          if (q) query = query.or(searchFilter(q));
+          const rows = unwrap(await query.order('started_at', { ascending: false }).limit(limit));
+          return rows.map(({ call_stages, ...call }) => ({
+            ...call,
+            need_words: call_stages?.[0]?.prospect_words ?? null,
+          }));
+        },
+
+        // Raw rows for GET /stats; stats.js does the counting. Two small queries
+        // instead of a SQL view/RPC, so the schema stays as it is. Fine for a
+        // free-tier project with at most a few thousand calls (capped at 5000).
+        async statsData() {
+          const calls = unwrap(await sb.from('calls')
+            .select('id, status, stage_reached, outcome').limit(5000));
+          const { count, error } = await sb.from('call_stages')
+            .select('id', { count: 'exact', head: true })
+            .eq('stage_no', 5).not('prospect_words', 'is', null).neq('prospect_words', '');
+          if (error) throw new Error(`db: ${error.message}`);
+          return { calls, withNeedWords: count ?? 0 };
+        },
+      };
     },
   };
 }

@@ -10,6 +10,7 @@
     "sync-stages": "node -e \"require('fs').copyFileSync('../shared/stages.json', 'src/stages.json'); console.log('copied ../shared/stages.json -> src/stages.json')\""
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.5"

@@ -11,6 +11,8 @@ Base URL: `VITE_API_URL` (Render). JSON in, JSON out. Errors: `{ "error": "messa
 | POST | `/calls/:id/summary` | `{ outcome? }` | `{ summary, suggested_outcome, flag, source: "llm"|"fallback" }` - LLM draft, nothing saved |
 | POST | `/calls/:id/close` | `{ outcome, stage_no, next_step?, summary?, outcome_flag? }` | `{ call }` - status closed, ended_at now, stage_reached = stage_no where the call ended; closing again overwrites |
 
+Login: every route except `/health` and `/stages` needs `Authorization: Bearer <Supabase access token>`, from an email in `ALLOWED_EMAILS`. 401 = missing or invalid login, 403 = not approved, 503 = login could not be checked. Users only ever see their own calls; another user's call answers 404. `GET /me` returns `{ user: { id, email } }`.
+
 Status codes: 400 validation, 401 missing/wrong `x-api-key` (only when `API_KEY` is set; `/health` and `/stages` exempt), 404 unknown call, 409 stage saved to a closed call. `stage_no` must be a JSON integer.
 | GET | `/calls` | `?limit=50` | `{ calls: [ { ...call, need_words } ] }` newest first; `need_words` = stage-5 words |
 | GET | `/calls/:id` | - | `{ call, stages: [...] }` |

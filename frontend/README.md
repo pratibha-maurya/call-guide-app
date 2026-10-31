@@ -8,6 +8,8 @@ Routes: `/` dashboard, `/call` live call (an in-progress call resumes here), `/c
 | Variable | Required | Notes |
 |---|---|---|
 | `VITE_API_URL` | yes, unless mocking | Backend URL, no trailing slash (`http://localhost:3000` locally, the Render URL in production). If it is missing and the mock is off, the app shows a config error banner instead of running. |
+| `VITE_SUPABASE_URL` | yes, unless mocking | Supabase project URL, for logging in. |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | yes, unless mocking | Publishable key only. Never the secret key: everything here reaches the browser. |
 | `VITE_API_KEY` | no | Sent as the `x-api-key` header when set. |
 | `VITE_USE_MOCK` | no | `true` runs on the in-memory mock API (`src/api/mock.js`) for offline demos. Nothing is saved. Any other value uses the real backend. |
 

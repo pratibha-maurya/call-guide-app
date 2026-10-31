@@ -1788,3 +1788,31 @@ kbd {
     transition: none !important;
   }
 }
+
+/* Login pages and the account area in the header */
+.auth {
+  max-width: 440px;
+}
+.auth-link {
+  color: var(--ink-soft);
+  align-self: flex-start;
+}
+.account {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.account-email {
+  color: var(--ink-soft);
+  font-size: var(--t-sm, 0.875rem);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .account-email {
+    display: none;
+  }
+}

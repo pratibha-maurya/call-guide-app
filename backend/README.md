@@ -3,7 +3,7 @@
 Express API for the cold-call guide. Data in Supabase; call record and mid-call
 suggestions from an OpenAI-compatible LLM (Groq by default). The contract is `../shared/API.md`.
 
-Files: `server.js` (routes), `db.js` (Supabase queries), `llm.js` (summary + suggest,
+Files: `server.js` (routes), `auth.js` (login check), `db.js` (Supabase queries), `llm.js` (summary + suggest,
 with fallbacks), `stats.js` (counts for `/stats`), `validate.js` (request checks),
 `stages.js` (loads `stages.json`).
 
@@ -12,7 +12,8 @@ with fallbacks), `stats.js` (counts for `/stats`), `validate.js` (request checks
 | Var | Required | Notes |
 |---|---|---|
 | `SUPABASE_URL` | yes | if missing, the server still boots: `/health` says `db: false`, data routes return 503 |
-| `SUPABASE_SERVICE_KEY` | yes | service-role key, server only |
+| `SUPABASE_PUBLISHABLE_KEY` | yes | public key; every query runs as the logged-in user. The service-role key is not used |
+| `ALLOWED_EMAILS` | yes | comma-separated emails allowed in. Empty means nobody can use the app; `*` means any confirmed account |
 | `LLM_API_KEY` | no | turns the LLM on. Free key: console.groq.com -> API Keys. Without it `/summary` returns the tap-based fallback and `/suggest` the static stage purpose |
 | `LLM_BASE_URL` | no | default `https://api.groq.com/openai/v1`; any OpenAI-compatible API |
 | `LLM_MODEL` | no | default `openai/gpt-oss-20b`; shown in `/health` as `llm_model` |
@@ -27,7 +28,7 @@ with fallbacks), `stats.js` (counts for `/stats`), `validate.js` (request checks
 cp .env.example .env    # fill it in
 npm install
 node --env-file=.env server.js   # or: npm run dev (export the vars first)
-npm test                # in-memory fake db, no network
+npm test                # fake db + in-memory Postgres for RLS, no network
 ```
 
 `stages.json` is a committed copy of `../shared/stages.json`. After editing the shared
