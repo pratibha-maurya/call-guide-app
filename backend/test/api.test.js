@@ -434,7 +434,7 @@ test('parseSuggestion', () => {
 describe('LLM config', () => {
   test('defaults to Groq; enabled only by LLM_API_KEY; empty strings count as unset', () => {
     assert.equal(DEFAULT_BASE_URL, 'https://api.groq.com/openai/v1');
-    assert.equal(DEFAULT_MODEL, 'llama-3.3-70b-versatile');
+    assert.equal(DEFAULT_MODEL, 'openai/gpt-oss-20b');
     assert.equal(createLlm({}).configured, false);
     assert.equal(createLlm({ baseUrl: 'https://x/v1', model: 'm' }).configured, false);
     const llm = createLlm({ baseUrl: '', apiKey: 'k', model: '' });

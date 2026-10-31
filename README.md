@@ -7,7 +7,7 @@ A screen that sits beside the phone during a cold call and keeps the caller on t
 | **Live screen (Vercel)** | _to be added_ |
 | **Backend health (Render)** | _to be added_ `/health` |
 | **Database** | Supabase (Postgres), schema in [`supabase/schema.sql`](supabase/schema.sql) |
-| **LLM** | Groq, `llama-3.3-70b-versatile` (OpenAI-compatible API), called only from the backend |
+| **LLM** | Groq, `openai/gpt-oss-20b` (OpenAI-compatible API), called only from the backend |
 
 ## How it fits together
 

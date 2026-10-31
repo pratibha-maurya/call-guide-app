@@ -35,7 +35,7 @@ clichés) and `follow_up` (one question to ask). On missing key / error / timeou
 static results as "Static guidance - AI unavailable", never as AI.
 
 LLM env defaults: `LLM_BASE_URL` defaults to `https://api.groq.com/openai/v1`, `LLM_MODEL` to
-`llama-3.3-70b-versatile`; only `LLM_API_KEY` is required. `/health` adds `llm_model`.
+`openai/gpt-oss-20b`; only `LLM_API_KEY` is required. `/health` adds `llm_model`.
 
 ## LLM (summary endpoint)
 OpenAI-compatible chat completions, configured by env:

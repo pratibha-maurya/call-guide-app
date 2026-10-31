@@ -11,7 +11,7 @@ import { getStage, outcomeKeys, tapLabel } from './stages.js';
 // Groq's free tier: OpenAI-compatible, fast enough for a live call.
 // Only LLM_API_KEY is required; these cover the other two.
 export const DEFAULT_BASE_URL = 'https://api.groq.com/openai/v1';
-export const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
+export const DEFAULT_MODEL = 'openai/gpt-oss-20b';
 
 const SYSTEM_PROMPT = `You write the record of one cold call. The caller sells growth and consulting work to Indian companies.
 Write exactly 2 short factual lines. If the prospect's stage-5 words are given, quote them verbatim inside double quotes.

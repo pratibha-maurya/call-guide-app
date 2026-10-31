@@ -36,3 +36,7 @@ create index if not exists call_stages_call_idx on call_stages (call_id);
 -- RLS is enabled with no policies so the anon key can read or write nothing.
 alter table calls enable row level security;
 alter table call_stages enable row level security;
+
+-- Bypassing RLS is not enough: the role also needs table privileges, which
+-- newer Supabase projects do not grant automatically.
+grant select, insert, update, delete on calls, call_stages to service_role;

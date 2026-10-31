@@ -15,7 +15,7 @@ with fallbacks), `stats.js` (counts for `/stats`), `validate.js` (request checks
 | `SUPABASE_SERVICE_KEY` | yes | service-role key, server only |
 | `LLM_API_KEY` | no | turns the LLM on. Free key: console.groq.com -> API Keys. Without it `/summary` returns the tap-based fallback and `/suggest` the static stage purpose |
 | `LLM_BASE_URL` | no | default `https://api.groq.com/openai/v1`; any OpenAI-compatible API |
-| `LLM_MODEL` | no | default `llama-3.3-70b-versatile`; shown in `/health` as `llm_model` |
+| `LLM_MODEL` | no | default `openai/gpt-oss-20b`; shown in `/health` as `llm_model` |
 | `CORS_ORIGINS` | yes in prod | comma-separated exact origins; add the literal `*.vercel.app` to allow preview URLs |
 | `NODE_ENV` | no | anything but `production` also allows `http://localhost:5173` |
 | `API_KEY` | no | if set, all routes except `/health` and `/stages` need header `x-api-key` |

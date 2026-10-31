@@ -2,7 +2,9 @@
 // arguments so tests can pass in-memory fakes; the bottom of the file wires the
 // real ones from env when this file is run directly (npm start).
 import { timingSafeEqual } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { parseEnv } from 'node:util';
 import express from 'express';
 import cors from 'cors';
 import { guide } from './stages.js';
@@ -159,6 +161,9 @@ export function createApp({ db, llm, config = {} }) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { createDb } = await import('./db.js');
   const { createLlm } = await import('./llm.js');
+  // Local dev: backend/.env wins over machine-wide variables. Render has no .env file.
+  const envFile = new URL('.env', import.meta.url);
+  if (existsSync(envFile)) Object.assign(process.env, parseEnv(readFileSync(envFile, 'utf8')));
   const env = process.env;
 
   const llm = createLlm({ baseUrl: env.LLM_BASE_URL, apiKey: env.LLM_API_KEY, model: env.LLM_MODEL });
