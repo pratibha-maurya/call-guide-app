@@ -4,7 +4,7 @@ A screen that sits beside the phone during a cold call and keeps the caller on t
 
 | | |
 |---|---|
-| **Live screen (Vercel)** | _to be added_ |
+| **Live screen (Vercel)** | https://call-guide-app.vercel.app |
 | **Backend health (Vercel)** | https://call-guide-api.vercel.app/health |
 | **Database** | Supabase (Postgres), schema in [`supabase/schema.sql`](supabase/schema.sql) |
 | **LLM** | Groq, `openai/gpt-oss-20b` (OpenAI-compatible API), called only from the backend |
