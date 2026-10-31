@@ -3,3 +3,7 @@ dist
 .env
 .env.local
 screenshots
+
+.vercel
+.env*
+!.env.example

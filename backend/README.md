@@ -48,3 +48,9 @@ query strings and env values are never logged.
 
 Free tier sleeps when idle; the first request after a nap takes ~30-50s.
 Run `../supabase/schema.sql` once in the Supabase SQL editor before first use.
+
+## Deploy to Vercel (current live setup)
+
+Project root: `backend/`. `api/index.js` is the entry point and `vercel.json` routes
+every path to it. Set the env vars above in the Vercel project, with
+`NODE_ENV=production` and `CORS_ORIGINS` set to the frontend URL.
